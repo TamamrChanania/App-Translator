@@ -10,23 +10,34 @@ services:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - appnet
+    healthcheck: # מוודא שהמסד מוכן לפני שהבקאנד מתחבר
+      test: ["CMD-SHELL", "pg_isready -U postgres -d translations"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   translator:
     image: libretranslate/libretranslate
     ports:
       - "5000:5000"
     networks:
       - appnet
+
   backend:
     build: ./backend
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/translations
+      TRANSLATOR_URL: http://translator:5000 # כתובת פנימית בתוך הרשת
     ports:
       - "3001:3001"
     depends_on:
-      - db
-      - translator
+      db:
+        condition: service_healthy # מחכה שהמסד יהיה תקין
+      translator:
+        condition: service_started
     networks:
       - appnet
+
   frontend:
     build: ./frontend
     ports:
